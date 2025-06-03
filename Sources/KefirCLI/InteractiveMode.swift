@@ -67,6 +67,9 @@ class InteractiveMode {
                 if let command = parseCommand(char) {
                     await handleCommand(command)
                 }
+            } else {
+                // No input available, sleep briefly to avoid busy-waiting
+                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
             }
         }
     }
@@ -423,12 +426,20 @@ class InteractiveMode {
         
         raw.c_lflag &= ~(UInt(ICANON | ECHO))
         tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw)
+        
+        // Make stdin non-blocking
+        let flags = fcntl(STDIN_FILENO, F_GETFL, 0)
+        _ = fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK)
     }
     
     private func disableRawMode() {
         if var original = originalTermios {
             tcsetattr(STDIN_FILENO, TCSAFLUSH, &original)
         }
+        
+        // Restore blocking mode
+        let flags = fcntl(STDIN_FILENO, F_GETFL, 0)
+        _ = fcntl(STDIN_FILENO, F_SETFL, flags & ~O_NONBLOCK)
     }
     
     private func readChar() -> Character? {
