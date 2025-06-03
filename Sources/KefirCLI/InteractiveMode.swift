@@ -5,6 +5,8 @@ import AsyncHTTPClient
 enum InteractiveCommand {
     case volumeUp
     case volumeDown
+    case volumeUpPrecise
+    case volumeDownPrecise
     case toggleMute
     case playPause
     case nextTrack
@@ -97,7 +99,18 @@ class InteractiveMode {
         // Volume progress bar (width 60 to match tables)
         UI.drawProgressBar(value: currentVolume, max: 100, width: 60)
         
-        // Status Box
+        // ASCII logo for Kefir - tall glass with drink
+        let logo = [
+            "   ╭─╮   ",
+            "  ╱   ╲  ",
+            " │ ≈≈≈ │ ",
+            " │     │ ",
+            " │     │ ",
+            " │KEFIR│ ",
+            " ╰─────╯ "
+        ]
+        
+        // Status Box with logo
         var statusContent: [String] = []
         
         // Power status
@@ -105,9 +118,6 @@ class InteractiveMode {
         
         // Source
         statusContent.append("Source: \(UI.color(currentSource.rawValue.capitalized, .blue))")
-        
-        // Volume
-        statusContent.append("Volume: \(currentVolume)%")
         
         // Now Playing
         if isPlaying, let track = currentTrack {
@@ -127,19 +137,53 @@ class InteractiveMode {
             statusContent.append(UI.dim("Not playing"))
         }
         
-        UI.drawBox(title: "Status", content: statusContent)
-        print()
+        // Draw custom box with logo on the right
+        let horizontalLine = String(repeating: "─", count: 58)
+        print("┌\(horizontalLine)┐")
         
-        // Controls
-        let controls = [
-            "Volume:     ↑/↓ (adjust)    m (mute/unmute)",
-            "Playback:   SPACE (play/pause)    →/← (next/prev)",
-            "Source:     s (change source)",
-            "Power:      p (toggle power)",
-            "Display:    r (refresh)    h (help)    q (quit)"
-        ]
+        // Title
+        let paddedTitle = " Status "
+        let titleLength = paddedTitle.count
+        let leftPadding = (60 - titleLength) / 2
+        let rightPadding = 60 - titleLength - leftPadding
+        print("│\(String(repeating: " ", count: leftPadding - 1))\(UI.bold(paddedTitle))\(String(repeating: " ", count: rightPadding - 1))│")
+        print("├\(horizontalLine)┤")
         
-        UI.drawBox(title: "Controls", content: controls.map { UI.dim($0) })
+        // Content with logo
+        for i in 0..<max(statusContent.count, logo.count) {
+            var leftContent = ""
+            var rightContent = ""
+            
+            if i < statusContent.count {
+                leftContent = statusContent[i]
+                // Remove ANSI codes to calculate actual length
+                let strippedLine = leftContent.replacingOccurrences(of: "\u{001B}\\[[0-9;]*m", with: "", options: .regularExpression)
+                let padding = 42 - strippedLine.count // Leave space for logo
+                leftContent = leftContent + String(repeating: " ", count: max(0, padding))
+            } else {
+                leftContent = String(repeating: " ", count: 42)
+            }
+            
+            if i < logo.count {
+                rightContent = UI.color(logo[i], .cyan)
+            } else {
+                rightContent = String(repeating: " ", count: 13) // Logo width
+            }
+            
+            // Ensure proper spacing
+            let totalVisible = leftContent.replacingOccurrences(of: "\u{001B}\\[[0-9;]*m", with: "", options: .regularExpression).count + 
+                              rightContent.replacingOccurrences(of: "\u{001B}\\[[0-9;]*m", with: "", options: .regularExpression).count
+            let extraPadding = max(0, 56 - totalVisible) // 60 - 4 (borders and spaces)
+            
+            print("│ \(leftContent)\(String(repeating: " ", count: extraPadding))\(rightContent) │")
+        }
+        
+        print("└\(horizontalLine)┘")
+        
+        // Controls tip - centered to table width (60)
+        let tip = "↑/↓ volume • space play/pause • →/← tracks • h help"
+        let padding = (60 - tip.count) / 2
+        print(String(repeating: " ", count: padding) + UI.dim(tip))
     }
     
     private func parseCommand(_ char: Character) -> InteractiveCommand? {
@@ -148,6 +192,19 @@ class InteractiveMode {
             if let next1 = readChar(), next1 == "[" {
                 if let next2 = readChar() {
                     switch next2 {
+                    case "1": // Check for Shift+Arrow sequences
+                        if let next3 = readChar(), next3 == ";" {
+                            if let next4 = readChar(), next4 == "2" {
+                                if let next5 = readChar() {
+                                    switch next5 {
+                                    case "A": return .volumeUpPrecise // Shift+Up
+                                    case "B": return .volumeDownPrecise // Shift+Down
+                                    default: break
+                                    }
+                                }
+                            }
+                        }
+                        return nil
                     case "A": return .volumeUp // Up arrow
                     case "B": return .volumeDown // Down arrow
                     case "C": return .nextTrack // Right arrow
@@ -176,6 +233,10 @@ class InteractiveMode {
             await adjustVolume(by: 5)
         case .volumeDown:
             await adjustVolume(by: -5)
+        case .volumeUpPrecise:
+            await adjustVolume(by: 1)
+        case .volumeDownPrecise:
+            await adjustVolume(by: -1)
         case .toggleMute:
             await toggleMute()
         case .playPause:
@@ -318,7 +379,8 @@ class InteractiveMode {
             UI.bold("KefirCLI Interactive Mode Help"),
             "",
             UI.underline("Volume Control:"),
-            "  ↑/↓ or +/-  : Adjust volume",
+            "  ↑/↓ or +/-  : Adjust volume (5% steps)",
+            "  Shift+↑/↓   : Adjust volume (1% steps)",
             "  m           : Mute/Unmute",
             "",
             UI.underline("Playback Control:"),
