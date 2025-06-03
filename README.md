@@ -42,7 +42,7 @@ A rich, full-featured command-line interface for controlling KEF wireless speake
 ### Homebrew
 
 ```bash
-brew tap melonamin/kefir
+brew tap melonamin/formulae
 brew install kefir
 ```
 
