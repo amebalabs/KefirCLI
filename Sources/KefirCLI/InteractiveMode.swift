@@ -30,6 +30,17 @@ class InteractiveMode {
     private var isPlaying = false
     private var currentTrack: SongInfo?
     
+    // State tracking for intelligent refresh
+    private struct UIState: Equatable {
+        let volume: Int
+        let isMuted: Bool
+        let source: KEFSource
+        let isPlaying: Bool
+        let trackInfo: SongInfo?
+    }
+    
+    private var previousState: UIState?
+    
     init(speaker: KEFSpeaker, speakerName: String) {
         self.speaker = speaker
         self.speakerName = speakerName
@@ -53,7 +64,10 @@ class InteractiveMode {
                 try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
                 if isRunning {
                     await updateStatus()
-                    await redrawInterface()
+                    // Only redraw if state has changed
+                    if hasStateChanged() {
+                        await redrawInterface()
+                    }
                 }
             }
         }
@@ -89,7 +103,25 @@ class InteractiveMode {
         }
     }
     
+    private func getCurrentState() -> UIState {
+        return UIState(
+            volume: currentVolume,
+            isMuted: isMuted,
+            source: currentSource,
+            isPlaying: isPlaying,
+            trackInfo: currentTrack
+        )
+    }
+    
+    private func hasStateChanged() -> Bool {
+        let currentState = getCurrentState()
+        return previousState != currentState
+    }
+    
     private func redrawInterface() async {
+        // Save current state
+        previousState = getCurrentState()
+        
         UI.clearScreen()
         UI.moveCursor(row: 1, column: 1)
         
