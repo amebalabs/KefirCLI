@@ -1,3 +1,13 @@
+```
+   ╭─╮
+  ╱   ╲
+ │ ≈≈≈ │
+ │     │
+ │     │
+ │KEFIR│
+ ╰─────╯
+```
+
 # KefirCLI 🎵
 
 A rich, full-featured command-line interface for controlling KEF wireless speakers with an interactive TUI mode and speaker profile management.
@@ -69,42 +79,36 @@ kefir interactive "Living Room"
 
 ## Interactive Mode
 
-The interactive mode provides a real-time control interface:
+The interactive mode provides a real-time control interface with auto-refresh every 5 seconds:
 
 ```
 🎵 KefirCLI - Living Room
 ────────────────────────────────────────────────────────────
 
-┌─────────────── Status ───────────────┐
-│ Power: ON                            │
-│ Source: Bluetooth                    │
-│ Volume:                              │
-│ [████████████████░░░░░░░░░░░░] 65%  │
-│                                      │
-│ Now Playing:                         │
-│   Title: Wonderful Tonight           │
-│   Artist: Eric Clapton               │
-│   Album: Slowhand                    │
-└──────────────────────────────────────┘
+[█████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░]  52%
 
-┌───────────── Controls ─────────────┐
-│ Volume:     ↑/↓ (adjust)    m (mute/unmute)      │
-│ Playback:   SPACE (play/pause)    →/← (next/prev)│
-│ Source:     s (change source)                     │
-│ Power:      p (toggle power)                      │
-│ Display:    r (refresh)    h (help)    q (quit)   │
-└───────────────────────────────────────────────────┘
+┌───────────────────────────────Status──────────────────────────────┐
+│ Power: ON                                                   ╭─╮   │
+│ Source: Bluetooth                                          ╱   ╲  │
+│                                                           │ ≈≈≈ │ │
+│ Now Playing:                                              │     │ │
+│   Title: Dangerous                                        │     │ │
+│   Artist: Sleep Token                                     │KEFIR│ │
+│   Album: Even In Arcadia                                  ╰─────╯ │
+└───────────────────────────────────────────────────────────────────┘
+        ↑/↓ volume • space play/pause • →/← tracks • h help
 ```
 
 ### Keyboard Shortcuts
 
-- **↑/↓** or **+/-**: Adjust volume
+- **↑/↓** or **+/-**: Adjust volume (5% steps)
+- **Shift+↑/↓**: Fine volume control (1% steps)
 - **m**: Toggle mute
 - **SPACE**: Play/pause
 - **→/←**: Next/previous track
 - **s**: Change input source
 - **p**: Toggle power
-- **r**: Refresh status
+- **r**: Manual refresh
 - **h** or **?**: Show help
 - **q** or **Ctrl+C**: Quit
 
