@@ -10,9 +10,16 @@
 
 # KefirCLI 🎵
 
+[![Swift](https://img.shields.io/badge/Swift-6.1-orange.svg)](https://swift.org)
+[![Platform](https://img.shields.io/badge/Platform-macOS-blue.svg)](https://www.apple.com/macos/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![KEF Compatible](https://img.shields.io/badge/KEF-LSX%20II%20%7C%20LS50%20II%20%7C%20LS60-purple.svg)](https://www.kef.com)
+
 A rich, full-featured command-line interface for controlling KEF wireless speakers with an interactive TUI mode and speaker profile management.
 
 > **Note**: This project uses [SwiftKEF](../SwiftKEF) library for speaker communication.
+> **Disclaimer**: This project is not affiliated with, authorized by, endorsed by, or in any way officially connected with KEF Audio or its subsidiaries. All product names, trademarks and registered trademarks are property of their respective owners.
+
 
 ## Features
 
@@ -31,6 +38,17 @@ A rich, full-featured command-line interface for controlling KEF wireless speake
 - **Status Dashboard**: View comprehensive speaker status at a glance
 
 ## Installation
+
+### Homebrew
+
+```bash
+brew tap melonamin/kefir
+brew install kefir
+```
+
+### GitHub Releases
+
+Download the latest release from the [releases page](https://github.com/melonamin/kefir/releases):
 
 ### Build from Source
 
