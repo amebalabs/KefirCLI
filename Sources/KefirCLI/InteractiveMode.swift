@@ -94,8 +94,8 @@ class InteractiveMode {
         print(UI.dim(String(repeating: "─", count: 60)))
         print()
         
-        // Volume progress bar
-        UI.drawProgressBar(value: currentVolume, max: 100, width: 40)
+        // Volume progress bar (width 60 to match tables)
+        UI.drawProgressBar(value: currentVolume, max: 100, width: 60)
         
         // Status Box
         var statusContent: [String] = []

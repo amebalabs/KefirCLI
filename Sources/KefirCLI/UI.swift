@@ -113,16 +113,21 @@ struct UI {
     
     static func drawProgressBar(value: Int, max: Int = 100, width: Int = 30, label: String = "") {
         let percentage = Double(value) / Double(max)
-        let filled = Int(Double(width) * percentage)
-        let empty = width - filled
-        
-        let bar = String(repeating: "█", count: filled) + String(repeating: "░", count: empty)
         let percentageText = String(format: "%3d%%", Int(percentage * 100))
         
+        // Account for brackets [  ] and percentage text when calculating bar width
+        // Format is: [bar]  percentage
+        // So available width for bar = width - 2 (brackets) - 2 (spaces) - 4 (percentage text)
+        let barWidth = Swift.max(10, width - 8)
+        let filled = Int(Double(barWidth) * percentage)
+        let empty = barWidth - filled
+        
+        let bar = String(repeating: "█", count: filled) + String(repeating: "░", count: empty)
+        
         if !label.isEmpty {
-            print("\(label): [\(color(bar, .cyan))] \(percentageText)")
+            print("\(label): [\(color(bar, .cyan))]  \(percentageText)")
         } else {
-            print("[\(color(bar, .cyan))] \(percentageText)")
+            print("[\(color(bar, .cyan))]  \(percentageText)")
         }
     }
     
