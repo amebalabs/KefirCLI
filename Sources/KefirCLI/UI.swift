@@ -98,9 +98,14 @@ struct UI {
         }
         
         for line in content {
-            let visibleLength = line.replacingOccurrences(of: #"\u{001B}\[[0-9;]*m"#, with: "", options: .regularExpression).count
-            let padding = width - visibleLength - 2
-            print("│ \(line)\(String(repeating: " ", count: max(0, padding))) │")
+            // Remove ANSI escape sequences to calculate actual visible length
+            let strippedLine = line.replacingOccurrences(of: "\u{001B}\\[[0-9;]*m", with: "", options: .regularExpression)
+            let visibleLength = strippedLine.count
+            // The line format is: "│ " + content + padding + " │"
+            // So total width should be: 1 + 1 + visibleLength + padding + 1 + 1 = width
+            // Therefore: padding = width - visibleLength - 4
+            let padding = max(0, width - visibleLength - 4)
+            print("│ \(line)\(String(repeating: " ", count: padding)) │")
         }
         
         print("└\(horizontalLine)┘")

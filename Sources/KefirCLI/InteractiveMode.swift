@@ -94,6 +94,9 @@ class InteractiveMode {
         print(UI.dim(String(repeating: "─", count: 60)))
         print()
         
+        // Volume progress bar
+        UI.drawProgressBar(value: currentVolume, max: 100, width: 40)
+        
         // Status Box
         var statusContent: [String] = []
         
@@ -104,8 +107,7 @@ class InteractiveMode {
         statusContent.append("Source: \(UI.color(currentSource.rawValue.capitalized, .blue))")
         
         // Volume
-        statusContent.append("Volume:")
-        UI.drawProgressBar(value: currentVolume, max: 100, width: 40, label: "")
+        statusContent.append("Volume: \(currentVolume)%")
         
         // Now Playing
         if isPlaying, let track = currentTrack {
