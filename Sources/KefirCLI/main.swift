@@ -32,8 +32,8 @@ struct KefirCLI: AsyncParsableCommand {
         ]
     )
     
-    static func main() async {
-        // If no arguments provided, check for first-time setup or show help
+    mutating func run() async throws {
+        // Check if this is first run (no speakers configured)
         if CommandLine.arguments.count == 1 {
             do {
                 let config = try ConfigurationManager()
@@ -41,31 +41,17 @@ struct KefirCLI: AsyncParsableCommand {
                 
                 if speakers.isEmpty {
                     // First time setup
-                    await runFirstTimeSetup()
+                    await Self.runFirstTimeSetup()
                     return
                 }
             } catch {
                 // Config doesn't exist yet, run first time setup
-                await runFirstTimeSetup()
+                await Self.runFirstTimeSetup()
                 return
             }
             
-            // Has speakers but no command specified - show help by parsing empty args
-            do {
-                var command = try parseAsRoot([])
-                try await command.run()
-            } catch {
-                exit(withError: error)
-            }
-            return
-        }
-        
-        // Normal execution with arguments
-        do {
-            var command = try parseAsRoot()
-            try await command.run()
-        } catch {
-            exit(withError: error)
+            // Has speakers but no command specified - show help
+            throw ValidationError("")
         }
     }
     
@@ -300,7 +286,7 @@ struct Speaker: AsyncParsableCommand {
 // MARK: - Common Options
 
 struct SpeakerOptions: ParsableArguments {
-    @Argument(help: ArgumentHelp("Speaker name or IP address", valueName: "speaker"))
+    @Option(name: [.short, .long], help: "Speaker name or IP address (uses default if not specified)")
     var speaker: String?
     
     func resolveSpeaker() async throws -> (host: String, name: String) {
