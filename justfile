@@ -4,10 +4,10 @@
 default:
     @just --list
 
-# Build universal binary in release mode
+# Build for current architecture in release mode
 build:
-    @echo "Building universal binary..."
-    swift build -c release --arch arm64 --arch x86_64
+    @echo "Building for current architecture..."
+    swift build -c release
 
 # Code sign the binary
 sign: build
@@ -87,6 +87,6 @@ install: build
 github-release: release
     @echo "Creating GitHub release archive..."
     mkdir -p dist
-    cp .build/release/kefir-notarized.zip dist/kefir-macos-universal.zip
-    cd dist && shasum -a 256 kefir-macos-universal.zip > kefir-macos-universal.zip.sha256
+    cp .build/release/kefir-notarized.zip dist/kefir-macos-arm64.zip
+    cd dist && shasum -a 256 kefir-macos-arm64.zip > kefir-macos-arm64.zip.sha256
     @echo "GitHub release files ready in dist/"
