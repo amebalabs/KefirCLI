@@ -1,5 +1,5 @@
 {
-  "originHash" : "7a508e7fb8659cec0f03729dfd4febf641d9f7f067fbc0b537aad934d7ef9972",
+  "originHash" : "ea4119c981ed9cbd4efab22bc5f9d796d313bf5deaf36c6eada8f509428f9962",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -179,15 +179,6 @@
       "state" : {
         "revision" : "61e4ca4b81b9e09e2ec863b00c340eb13497dac6",
         "version" : "1.5.0"
-      }
-    },
-    {
-      "identity" : "swiftkef",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/melonamin/SwiftKEF.git",
-      "state" : {
-        "revision" : "088e996f23489e97beea723f0ed24e2cc445e0cd",
-        "version" : "1.0.1"
       }
     }
   ],

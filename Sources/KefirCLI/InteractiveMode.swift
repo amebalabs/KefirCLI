@@ -29,6 +29,14 @@ class InteractiveMode {
     private var currentSource: KEFSource = .wifi
     private var isPlaying = false
     private var currentTrack: SongInfo?
+    private var currentSongPosition: Int64?
+    private var currentSongDuration: Int?
+    private var pollingTask: Task<Void, Error>?
+    private var lastUpdateTime: Date = Date()
+    private var updateCount: Int = 0
+    private var isHandlingCommand: Bool = false
+    private var showingHelp: Bool = false
+    private var showingSourceMenu: Bool = false
     
     // State tracking for intelligent refresh
     private struct UIState: Equatable {
@@ -37,6 +45,8 @@ class InteractiveMode {
         let source: KEFSource
         let isPlaying: Bool
         let trackInfo: SongInfo?
+        let songPosition: Int64?
+        let songDuration: Int?
     }
     
     private var previousState: UIState?
@@ -49,7 +59,10 @@ class InteractiveMode {
     func run() async throws {
         // Setup terminal
         enableRawMode()
-        defer { disableRawMode() }
+        defer { 
+            disableRawMode()
+            pollingTask?.cancel()
+        }
         
         UI.clearScreen()
         UI.hideCursor()
@@ -58,15 +71,85 @@ class InteractiveMode {
         // Initial status fetch
         await updateStatus()
         
-        // Start refresh timer
-        Task {
-            while isRunning {
-                try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
-                if isRunning {
-                    await updateStatus()
-                    // Only redraw if state has changed
-                    if hasStateChanged() {
+        // Get initial song position if playing
+        if isPlaying {
+            do {
+                currentSongPosition = try await speaker.getSongPosition()
+                currentSongDuration = try await speaker.getSongDuration()
+                // Initial position fetched
+            } catch {
+                // Ignore errors
+            }
+        }
+        
+        // Start polling for real-time updates
+        pollingTask = Task {
+            do {
+                // Use longer timeout for true real-time updates (speaker will respond immediately on changes)
+                let eventStream = await speaker.startPolling(pollInterval: 10, pollSongStatus: true)
+                
+                for try await event in eventStream {
+                    guard isRunning else { break }
+                    
+                    // Update state from event
+                    var hasChanges = false
+                    
+                    if let volume = event.volume {
+                        currentVolume = volume
+                        isMuted = volume == 0
+                        hasChanges = true
+                    }
+                    if let source = event.source {
+                        currentSource = source
+                        hasChanges = true
+                    }
+                    if let state = event.playbackState {
+                        isPlaying = state == .playing
+                        // Clear track info when stopped
+                        if state != .playing {
+                            currentTrack = nil
+                            currentSongPosition = nil
+                            currentSongDuration = nil
+                        }
+                        hasChanges = true
+                    }
+                    if let songInfo = event.songInfo {
+                        currentTrack = songInfo
+                        hasChanges = true
+                    }
+                    if let position = event.songPosition {
+                        currentSongPosition = position
+                        hasChanges = true
+                        // Song position updated
+                    }
+                    if let duration = event.songDuration {
+                        currentSongDuration = duration
+                        hasChanges = true
+                        // Song duration updated
+                    }
+                    
+                    // Track update for debugging
+                    if hasChanges {
+                        updateCount += 1
+                        lastUpdateTime = Date()
+                    }
+                    
+                    // Only redraw if state has changed or we're not showing menus
+                    if hasStateChanged() && !showingHelp && !showingSourceMenu {
                         await redrawInterface()
+                    }
+                }
+            } catch {
+                // Polling failed - show error in UI
+                if isRunning {
+                    await showError("Polling error: \(error.localizedDescription)")
+                    // Try to continue with manual updates as fallback
+                    while isRunning {
+                        try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+                        await updateStatus()
+                        if hasStateChanged() {
+                            await redrawInterface()
+                        }
                     }
                 }
             }
@@ -74,6 +157,21 @@ class InteractiveMode {
         
         // Draw initial interface
         await redrawInterface()
+        
+        // Start a timer to refresh the UI periodically to show update status
+        let uiRefreshTask = Task {
+            while isRunning {
+                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                // Don't redraw if we're showing help or a menu
+                if isRunning && !isHandlingCommand && !showingHelp && !showingSourceMenu {
+                    // Skip refresh if only position changed recently
+                    let timeSinceLastEvent = Date().timeIntervalSince(lastUpdateTime)
+                    if timeSinceLastEvent > 2.0 || !isPlaying {
+                        await redrawInterface()
+                    }
+                }
+            }
+        }
         
         // Main input loop
         while isRunning {
@@ -86,6 +184,8 @@ class InteractiveMode {
                 try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
             }
         }
+        
+        uiRefreshTask.cancel()
     }
     
     private func updateStatus() async {
@@ -109,13 +209,42 @@ class InteractiveMode {
             isMuted: isMuted,
             source: currentSource,
             isPlaying: isPlaying,
-            trackInfo: currentTrack
+            trackInfo: currentTrack,
+            songPosition: currentSongPosition,
+            songDuration: currentSongDuration
         )
     }
     
     private func hasStateChanged() -> Bool {
         let currentState = getCurrentState()
         return previousState != currentState
+    }
+    
+    private func wrapText(_ text: String, width: Int, indent: Int = 0) -> [String] {
+        guard text.count > width else { return [text] }
+        
+        var lines: [String] = []
+        var currentLine = ""
+        let words = text.split(separator: " ")
+        let indentString = String(repeating: " ", count: indent)
+        
+        for word in words {
+            let wordStr = String(word)
+            if currentLine.isEmpty {
+                currentLine = wordStr
+            } else if currentLine.count + 1 + wordStr.count <= width {
+                currentLine += " " + wordStr
+            } else {
+                lines.append(currentLine)
+                currentLine = indentString + wordStr
+            }
+        }
+        
+        if !currentLine.isEmpty {
+            lines.append(currentLine)
+        }
+        
+        return lines.isEmpty ? [""] : lines
     }
     
     private func redrawInterface() async {
@@ -128,11 +257,11 @@ class InteractiveMode {
         // Header
         let title = "🎵 KefirCLI - \(speakerName)"
         print(UI.bold(UI.color(title, .cyan)))
-        print(UI.dim(String(repeating: "─", count: 60)))
+        print(UI.dim(String(repeating: "─", count: 80)))
         print()
         
-        // Volume progress bar (width 60 to match tables)
-        UI.drawProgressBar(value: currentVolume, max: 100, width: 60)
+        // Volume progress bar (width 80 to match tables)
+        UI.drawProgressBar(value: currentVolume, max: 100, width: 80)
         
         // ASCII logo for Kefir - tall glass with drink
         let logo = [
@@ -159,13 +288,47 @@ class InteractiveMode {
             statusContent.append("")
             statusContent.append(UI.bold("Now Playing:"))
             if let title = track.title {
-                statusContent.append("  Title: \(title)")
+                let titleLines = wrapText(title, width: 50, indent: 2)
+                statusContent.append("  Title: \(titleLines[0])")
+                for i in 1..<titleLines.count {
+                    statusContent.append("         \(titleLines[i])")
+                }
             }
             if let artist = track.artist {
-                statusContent.append("  Artist: \(artist)")
+                let artistLines = wrapText(artist, width: 50, indent: 2)
+                statusContent.append("  Artist: \(artistLines[0])")
+                for i in 1..<artistLines.count {
+                    statusContent.append("          \(artistLines[i])")
+                }
             }
             if let album = track.album {
-                statusContent.append("  Album: \(album)")
+                let albumLines = wrapText(album, width: 50, indent: 2)
+                statusContent.append("  Album: \(albumLines[0])")
+                for i in 1..<albumLines.count {
+                    statusContent.append("         \(albumLines[i])")
+                }
+            }
+            
+            // Add song progress if available
+            if let position = currentSongPosition, let duration = currentSongDuration, duration > 0 {
+                let positionSec = Int(position) / 1000
+                let durationSec = duration / 1000
+                let progress = Double(position) / Double(duration)
+                
+                let positionMin = positionSec / 60
+                let positionSecRem = positionSec % 60
+                let durationMin = durationSec / 60
+                let durationSecRem = durationSec % 60
+                
+                statusContent.append("")
+                statusContent.append("  Progress: \(String(format: "%d:%02d / %d:%02d", positionMin, positionSecRem, durationMin, durationSecRem))")
+                
+                // Progress bar (30 chars wide, more compact)
+                let barWidth = 30
+                let filledWidth = Int(Double(barWidth) * progress)
+                let emptyWidth = barWidth - filledWidth
+                let progressBar = String(repeating: "█", count: filledWidth) + String(repeating: "░", count: emptyWidth)
+                statusContent.append("  " + UI.color(progressBar, .cyan))
             }
         } else {
             statusContent.append("")
@@ -173,14 +336,14 @@ class InteractiveMode {
         }
         
         // Draw custom box with logo on the right
-        let horizontalLine = String(repeating: "─", count: 58)
+        let horizontalLine = String(repeating: "─", count: 78)
         print("┌\(horizontalLine)┐")
         
         // Title
         let paddedTitle = " Status "
         let titleLength = paddedTitle.count
-        let leftPadding = (60 - titleLength) / 2
-        let rightPadding = 60 - titleLength - leftPadding
+        let leftPadding = (80 - titleLength) / 2
+        let rightPadding = 80 - titleLength - leftPadding
         print("│\(String(repeating: " ", count: leftPadding - 1))\(UI.bold(paddedTitle))\(String(repeating: " ", count: rightPadding - 1))│")
         print("├\(horizontalLine)┤")
         
@@ -193,10 +356,10 @@ class InteractiveMode {
                 leftContent = statusContent[i]
                 // Remove ANSI codes to calculate actual length
                 let strippedLine = leftContent.replacingOccurrences(of: "\u{001B}\\[[0-9;]*m", with: "", options: .regularExpression)
-                let padding = 42 - strippedLine.count // Leave space for logo
+                let padding = 62 - strippedLine.count // Leave space for logo (increased from 42)
                 leftContent = leftContent + String(repeating: " ", count: max(0, padding))
             } else {
-                leftContent = String(repeating: " ", count: 42)
+                leftContent = String(repeating: " ", count: 62)
             }
             
             if i < logo.count {
@@ -208,16 +371,16 @@ class InteractiveMode {
             // Ensure proper spacing
             let totalVisible = leftContent.replacingOccurrences(of: "\u{001B}\\[[0-9;]*m", with: "", options: .regularExpression).count + 
                               rightContent.replacingOccurrences(of: "\u{001B}\\[[0-9;]*m", with: "", options: .regularExpression).count
-            let extraPadding = max(0, 56 - totalVisible) // 60 - 4 (borders and spaces)
+            let extraPadding = max(0, 76 - totalVisible) // 80 - 4 (borders and spaces)
             
             print("│ \(leftContent)\(String(repeating: " ", count: extraPadding))\(rightContent) │")
         }
         
         print("└\(horizontalLine)┘")
         
-        // Controls tip - centered to table width (60)
+        // Controls tip - centered to table width (80)
         let tip = "↑/↓ volume • space play/pause • →/← tracks • h help"
-        let padding = (60 - tip.count) / 2
+        let padding = (80 - tip.count) / 2
         print(String(repeating: " ", count: padding) + UI.dim(tip))
     }
     
@@ -263,6 +426,9 @@ class InteractiveMode {
     }
     
     private func handleCommand(_ command: InteractiveCommand) async {
+        isHandlingCommand = true
+        defer { isHandlingCommand = false }
+        
         switch command {
         case .volumeUp:
             await adjustVolume(by: 5)
@@ -285,7 +451,10 @@ class InteractiveMode {
         case .powerToggle:
             await togglePower()
         case .showStatus, .refresh:
+            // Force immediate status update and redraw
             await updateStatus()
+            updateCount += 1
+            lastUpdateTime = Date()
             await redrawInterface()
         case .help:
             await showHelp()
@@ -313,7 +482,7 @@ class InteractiveMode {
                 try await speaker.mute()
             }
             isMuted.toggle()
-            await updateStatus()
+            // Polling will update the state automatically
             await redrawInterface()
         } catch {
             await showError("Failed to toggle mute")
@@ -324,8 +493,7 @@ class InteractiveMode {
         do {
             try await speaker.togglePlayPause()
             isPlaying.toggle()
-            try? await Task.sleep(nanoseconds: 500_000_000) // Wait for state to update
-            await updateStatus()
+            // Polling will update the state automatically
             await redrawInterface()
         } catch {
             await showError("Failed to toggle playback")
@@ -335,8 +503,7 @@ class InteractiveMode {
     private func nextTrack() async {
         do {
             try await speaker.nextTrack()
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            await updateStatus()
+            // Polling will update the state automatically
             await redrawInterface()
         } catch {
             await showError("Failed to skip track")
@@ -346,8 +513,7 @@ class InteractiveMode {
     private func previousTrack() async {
         do {
             try await speaker.previousTrack()
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            await updateStatus()
+            // Polling will update the state automatically
             await redrawInterface()
         } catch {
             await showError("Failed to go to previous track")
@@ -355,6 +521,10 @@ class InteractiveMode {
     }
     
     private func changeSource() async {
+        isHandlingCommand = true  // Prevent UI refresh while showing menu
+        showingSourceMenu = true
+        defer { showingSourceMenu = false }
+        
         // Show source selection menu
         UI.clearScreen()
         UI.moveCursor(row: 1, column: 1)
@@ -389,6 +559,7 @@ class InteractiveMode {
             }
         }
         
+        isHandlingCommand = false
         await redrawInterface()
     }
     
@@ -407,6 +578,10 @@ class InteractiveMode {
     }
     
     private func showHelp() async {
+        isHandlingCommand = true  // Prevent UI refresh while showing help
+        showingHelp = true
+        defer { showingHelp = false }
+        
         UI.clearScreen()
         UI.moveCursor(row: 1, column: 1)
         
@@ -425,7 +600,7 @@ class InteractiveMode {
             UI.underline("Other Controls:"),
             "  s           : Change input source",
             "  p           : Toggle power",
-            "  r           : Refresh status",
+            "  r           : Force refresh display",
             "  h or ?      : Show this help",
             "  q or Ctrl+C : Quit interactive mode",
             "",
@@ -436,7 +611,11 @@ class InteractiveMode {
             print(line)
         }
         
-        _ = readChar()
+        // Wait for keypress - use blocking read
+        while readChar() == nil {
+            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+        }
+        isHandlingCommand = false
         await redrawInterface()
     }
     

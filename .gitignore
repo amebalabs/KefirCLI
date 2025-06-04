@@ -1,8 +1,25 @@
+# macOS
 .DS_Store
+
+# Swift Package Manager
 /.build
 /Packages
-xcuserdata/
-DerivedData/
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+Package.resolved
+
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcodeproj
+
+# Other
 .netrc
+
+# Test files
+test-*.swift
+
+# Release artifacts
+*.tar.gz
+*.zip
+kefir-v*

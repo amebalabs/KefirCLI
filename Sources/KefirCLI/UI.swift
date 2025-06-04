@@ -83,6 +83,14 @@ struct UI {
         print("\u{001B}[?25h", terminator: "")
     }
     
+    static func clearLine() {
+        print("\u{001B}[2K", terminator: "")
+    }
+    
+    static func clearToEndOfLine() {
+        print("\u{001B}[K", terminator: "")
+    }
+    
     static func drawBox(title: String, content: [String], width: Int = 60) {
         let horizontalLine = String(repeating: "─", count: width - 2)
         
