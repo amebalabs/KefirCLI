@@ -9,7 +9,7 @@ struct KefirCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "kefir",
         abstract: "🎵 A rich CLI for controlling KEF wireless speakers",
-        version: "1.0.0",
+        version: "1.1.1",
         subcommands: [
             // Speaker Management
             Speaker.self,

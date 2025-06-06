@@ -5,6 +5,18 @@ All notable changes to KefirCLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2025-06-06
+
+### Fixed
+- Configuration file compatibility with Kefir macOS app
+- Date encoding/decoding to use ISO8601 format
+- Configuration struct naming to match Kefir's format
+
+### Changed
+- Aligned configuration format with Kefir macOS app
+- Made theme properties immutable to match Kefir
+- Removed unused `lastUsedSpeakerId` field
+
 ## [1.1.0] - 2025-06-04
 
 ### Added
