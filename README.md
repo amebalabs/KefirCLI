@@ -17,7 +17,7 @@
 
 A rich, full-featured command-line interface for controlling KEF wireless speakers with an interactive TUI mode and speaker profile management.
 
-> **Note**: [Keifr](https://github.com/melonamin/Kefir) offers the same features in the form of a beautiful macOS menu bar app.
+> **Note**: [Kefir](https://github.com/melonamin/Kefir) offers the same features in the form of a beautiful macOS menu bar app.
 
 
 > **Disclaimer**: This project is not affiliated with, authorized by, endorsed by, or in any way officially connected with KEF Audio or its subsidiaries. All product names, trademarks and registered trademarks are property of their respective owners.
