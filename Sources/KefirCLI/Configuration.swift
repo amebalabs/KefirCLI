@@ -16,24 +16,29 @@ struct SpeakerProfile: Codable {
     }
 }
 
-struct KefirConfiguration: Codable {
+struct Theme: Codable {
+    let useColors: Bool
+    let useEmojis: Bool
+    
+    init(useColors: Bool = true, useEmojis: Bool = true) {
+        self.useColors = useColors
+        self.useEmojis = useEmojis
+    }
+}
+
+struct Configuration: Codable {
     var speakers: [SpeakerProfile]
-    var lastUsedSpeakerId: UUID?
     var theme: Theme
     
-    struct Theme: Codable {
-        var useColors: Bool
-        var useEmojis: Bool
-        
-        static let `default` = Theme(useColors: true, useEmojis: true)
+    init(speakers: [SpeakerProfile] = [], theme: Theme = Theme()) {
+        self.speakers = speakers
+        self.theme = theme
     }
-    
-    static let `default` = KefirConfiguration(speakers: [], lastUsedSpeakerId: nil, theme: .default)
 }
 
 actor ConfigurationManager {
     private let configURL: URL
-    private var configuration: KefirConfiguration
+    private var configuration: Configuration
     
     init() throws {
         let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
@@ -47,9 +52,11 @@ actor ConfigurationManager {
         // Load existing configuration or create default
         if FileManager.default.fileExists(atPath: configURL.path) {
             let data = try Data(contentsOf: configURL)
-            self.configuration = try JSONDecoder().decode(KefirConfiguration.self, from: data)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            self.configuration = try decoder.decode(Configuration.self, from: data)
         } else {
-            self.configuration = .default
+            self.configuration = Configuration()
             Task {
                 try await save()
             }
@@ -59,6 +66,7 @@ actor ConfigurationManager {
     private func save() throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(configuration)
         try data.write(to: configURL)
     }
@@ -105,9 +113,6 @@ actor ConfigurationManager {
     
     func removeSpeaker(id: UUID) async throws {
         configuration.speakers.removeAll { $0.id == id }
-        if configuration.lastUsedSpeakerId == id {
-            configuration.lastUsedSpeakerId = nil
-        }
         try save()
     }
     
@@ -139,7 +144,6 @@ actor ConfigurationManager {
     }
     
     func updateLastUsed(speakerId: UUID) async throws {
-        configuration.lastUsedSpeakerId = speakerId
         if let index = configuration.speakers.firstIndex(where: { $0.id == speakerId }) {
             configuration.speakers[index].lastSeen = Date()
         }
@@ -148,17 +152,15 @@ actor ConfigurationManager {
     
     // MARK: - Theme Management
     
-    func getTheme() async -> KefirConfiguration.Theme {
+    func getTheme() async -> Theme {
         return configuration.theme
     }
     
     func updateTheme(useColors: Bool? = nil, useEmojis: Bool? = nil) async throws {
-        if let useColors = useColors {
-            configuration.theme.useColors = useColors
-        }
-        if let useEmojis = useEmojis {
-            configuration.theme.useEmojis = useEmojis
-        }
+        configuration.theme = Theme(
+            useColors: useColors ?? configuration.theme.useColors,
+            useEmojis: useEmojis ?? configuration.theme.useEmojis
+        )
         try save()
     }
 }
