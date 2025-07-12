@@ -1,4 +1,9 @@
 import Foundation
+#if os(Linux)
+import Glibc
+#else
+import Darwin
+#endif
 
 enum ANSIColor: String {
     case black = "\u{001B}[30m"
@@ -198,7 +203,8 @@ final class Spinner: @unchecked Sendable {
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             self.queue.sync {
                 print("\r\(UI.color(self.frames[self.currentFrame], .cyan)) \(self.message)", terminator: "")
-                fflush(stdout)
+                // Force flush without using stdout directly
+                FileHandle.standardOutput.synchronizeFile()
                 self.currentFrame = (self.currentFrame + 1) % self.frames.count
             }
         }

@@ -1,6 +1,11 @@
 import Foundation
 import SwiftKEF
 import AsyncHTTPClient
+#if os(Linux)
+import Glibc
+#else
+import Darwin
+#endif
 
 enum InteractiveCommand {
     case volumeUp
@@ -635,7 +640,7 @@ class InteractiveMode {
         tcgetattr(STDIN_FILENO, &raw)
         originalTermios = raw
         
-        raw.c_lflag &= ~(UInt(ICANON | ECHO))
+        raw.c_lflag &= ~UInt32(ICANON | ECHO)
         tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw)
         
         // Make stdin non-blocking
